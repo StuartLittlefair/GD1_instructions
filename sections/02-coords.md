@@ -297,7 +297,7 @@ coord_gd1
     (-94.97222038, 34.5813813)>
 ```
 
-```{exercise}
+````{exercise}
 ### Exercise (5 minutes)
 
 Find the location of GD-1 in ICRS coordinates.
@@ -310,7 +310,7 @@ Hint: Because ICRS is a standard frame, it is built into Astropy. You can specif
 
 You should find that the origin of the GD-1 frame maps to `ra=200`, exactly, in ICRS.  That is by design.
 ```
-```
+````
 
 ## Selecting a rectangle
 
