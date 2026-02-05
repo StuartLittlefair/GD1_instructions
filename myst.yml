@@ -1,0 +1,24 @@
+# See docs at: https://mystmd.org/guide/frontmatter
+version: 1
+project:
+  id: 6a5f0dc4-52e3-49b7-abc4-02be4d3e6daf
+  title: Stellar Streams in the Milky Way with Gaia
+  # description:
+  # keywords: []
+  # authors: []
+  # github:
+  toc:
+    - file: sections/01-query.md
+    - file: sections/02-coords.md
+    - file: sections/03-transform.md
+    - file: sections/04-motion.md
+    - file: sections/05-select.md
+    - file: sections/06-join.md
+    - file: sections/07-photo.md
+    - file: sections/08-plot.md
+site:
+  template: book-theme
+  options:
+    #   favicon: favicon.ico
+    logo: logo.png
+    logo_text: GD1 streams
