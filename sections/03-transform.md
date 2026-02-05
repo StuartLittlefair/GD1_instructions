@@ -545,7 +545,7 @@ We can write a Pandas `DataFrame` to an HDF5 file like this:
 ```{code-cell} python
 filename = '/content/drive/MyDrive/GD1_Results/gd1_data.hdf'
 
-results_df.to_hdf(filename, 'results_df', mode='w')
+results_df.to_hdf(filename, key='results_df', mode='w')
 ```
 
 Because an HDF5 file can contain more than one Dataset, we have to provide a name, or "key", that identifies the Dataset in the file.

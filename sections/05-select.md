@@ -347,7 +347,7 @@ Now we can save our `Series` using `to_hdf()`.
 
 ```{code-cell} python
 filename = '/content/drive/MyDrive/GD1_Results/gd1_data.hdf'
-point_series.to_hdf(filename, 'point_series')
+point_series.to_hdf(filename, key='point_series')
 ```
 
 ````{important}
@@ -359,7 +359,7 @@ You may see the previous command issue this or a similar performance warning:
 [...] PerformanceWarning:
 your performance may suffer as PyTables will pickle object types that it cannot
 map directly to c-types [inferred_type->mixed-integer,key->values] [items->None]
-  point_series.to_hdf(filename, 'point_series')
+  point_series.to_hdf(filename, key='point_series')
 ```
 
 This is because in the Series we just created, we are mixing variables of different types: `sky_point_list` is a string (text), whereas `pmra_min` etc. are floating point numbers. While combining different data types in a single Series is somewhat inefficient, the amount of data is small enough to not matter in this case, so this warning can be safely ignored.

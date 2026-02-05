@@ -442,7 +442,7 @@ We can add to our new Pandas `DataFrame` to an **existing** HDF5 file by omittin
 ```{code-cell} python
 filename = '/content/drive/MyDrive/GD1_Results/gd1_data.hdf'
 
-selected_df.to_hdf(filename, 'selected_df')
+selected_df.to_hdf(filename, key='selected_df')
 ```
 
 Because an HDF5 file can contain more than one Dataset, we have to provide a name, or "key", that identifies the Dataset in the file.

@@ -393,7 +393,7 @@ Here is how we can save it in an HDF5 file.
 
 ```{code-cell} python
 filename = '/content/drive/MyDrive/GD1_Results/gd1_data.hdf'
-loop_df.to_hdf(filename, 'loop_df')
+loop_df.to_hdf(filename, key='loop_df')
 ```
 
 ## Selecting based on photometry
@@ -533,7 +533,7 @@ Finally, we will write the selected stars to a file.
 
 ```{code-cell} python
 filename = '/content/drive/MyDrive/GD1_Results/gd1_data.hdf'
-winner_df.to_hdf(filename, 'winner_df')
+winner_df.to_hdf(filename, key='winner_df')
 ```
 
 ```{code-cell} python
