@@ -810,7 +810,7 @@ In this episode, we used database `JOIN` operations to select photometry data fo
 
 In the next episode, we will use this data for a second round of selection, identifying stars that have photometry data consistent with GD-1.
 
-## Key Points
+## Key Points
 
 - Use `JOIN` operations to combine data from multiple tables in a database, using some kind of identifier to match up records from one table with records from another. This is another example of a practice we saw in the previous notebook, moving the computation to the data. 
 - For most applications, saving data in FITS or HDF5 is better than CSV.  FITS and HDF5 are binary formats, so the files are usually smaller, and they store metadata, so you don't lose anything when you read the file back. 
