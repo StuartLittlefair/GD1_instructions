@@ -3,11 +3,19 @@ version: 1
 project:
   id: 6a5f0dc4-52e3-49b7-abc4-02be4d3e6daf
   title: Stellar Streams in the Milky Way with Gaia
+  authors:
+    - name: Stuart Littlefair
+  exports:
+    - format: typst
+      template: lapreprint-typst
+      output: exports/book.pdf
+      id: output-pdf
   # description:
   # keywords: []
   # authors: []
   # github:
   toc:
+    - file: index.md
     - file: sections/01-query.md
     - file: sections/02-coords.md
     - file: sections/03-transform.md

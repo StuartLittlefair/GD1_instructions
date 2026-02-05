@@ -60,7 +60,7 @@ The code below adds the folder `/content/drive/Shareddrives/ClassroomShared/MPS2
 
 ```{code-cell} python
 import sys
-sys.path.append(/content/drive/Shareddrives/ClassroomShared/MPS216/GD1/)
+sys.path.append("/content/drive/Shareddrives/ClassroomShared/MPS216/GD1/")
 
 from episode_functions import make_rectangle, skycoord_to_string
 ```

@@ -54,7 +54,7 @@ This imports previously written functions, including the plotting functions in t
 
 ```{code-cell} python
 import sys
-sys.path.append(/content/drive/Shareddrives/ClassroomShared/MPS216/GD1/)
+sys.path.append("/content/drive/Shareddrives/ClassroomShared/MPS216/GD1/")
 
 
 from episode_functions import *
