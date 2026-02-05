@@ -44,7 +44,7 @@ drive.mount("/content/drive")
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.gaia import Gaia
-from gala.coordinates import GD1Koposov10, GD1, reflex_correct
+from gala.coordinates import GD1Koposov10, reflex_correct
 import matplotlib.pyplot as plt
 import pandas as pd
 ```
