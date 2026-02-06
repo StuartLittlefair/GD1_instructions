@@ -305,227 +305,19 @@ ps_valid_results
 67553513677687787             -- 21.2831001281738
 ```
 
-## Joining tables
 
-The following figure shows how these tables are related.
+## Uploading tables
 
-- The orange circles and arrows represent the first `JOIN` operation, which takes each `source_id` in the Gaia table and finds the same value of `source_id` in the best neighbor table.
 
-- The blue circles and arrows represent the second `JOIN` operation, which takes each `original_ext_source_id` in the Gaia table and finds the same value of `obj_id` in the best neighbor table.
+```{attention}
+Since all three of the `gaia_source`, `panstarrs1_best_neighbour` and `panstarrs1_original_valid` tables are available online, the best way to get the data
+we want would be to run a **single** AQDL query that combined the proper motion selection from the [last session](./05-select.md) with `JOIN` operations on the panstarrs1 tables.
 
-There is no guarantee that the corresponding rows of these tables are in the same order, so the `JOIN` operation involves some searching. However, ADQL/SQL databases are implemented in a way that makes this kind of search efficient. If you are curious, you can [read more about it](https://chartio.com/learn/databases/how-does-indexing-work/).
+However, due to [ongoing technical issues](https://www.cosmos.esa.int/web/gaia/news#WorkaroundArchive) with the Gaia archive we are going to take a different approach.
 
-![Diagram showing relationship between the gaia_source, panstarrs1_best_neighbour, and panstarrs1_original_valid tables and result table.](fig/join.png)
-
-Now we will get to the details of performing a `JOIN` operation.
-
-We are about to build a complex query using software that doesn't provide us with any helpful information for debugging. For this reason we are going to start with a simplified version of what we want to do until we are sure  we are joining the tables correctly, then we will slowly add more layers of complexity, checking at each stage that our query still works. As a starting place, we will go all the way back to the cone search from the start of the project.
-
-```{code-cell} python
-test_cone_query = """SELECT 
-TOP 10 
-source_id
-FROM gaiadr2.gaia_source
-WHERE 1=CONTAINS(
-  POINT(ra, dec),
-  CIRCLE(88.8, 7.4, 0.08333333))
-"""
+We will run a first query to select sources from the `gaia_source` catalog and save these to a file on the Colab computer. We will then run a second query that **uploads** our proper motion candidate table to the archive and performs a `JOIN` with that.
 ```
-
-And we will run it, to make sure we have a working query to build on.
-
-```{code-cell} python
-test_cone_job = Gaia.launch_job(test_cone_query)
-```
-
-```output
-INFO: Query finished. [astroquery.utils.tap.core]
-```
-
-```{code-cell} python
-test_cone_results = test_cone_job.get_results()
-test_cone_results
-```
-
-```output
-<Table length=10>
-     source_id     
-       int64       
--------------------
-3322773965056065536
-3322773758899157120
-3322774068134271104
-3322773930696320512
-3322774377374425728
-3322773724537891456
-3322773724537891328
-[Output truncated]
-```
-
-Now we can start adding features. First, we will replace `source_id` with the format specifier `columns` so that we can alter what columns we want to return without having to modify our base query:
-
-```{code-cell} python
-cone_base_query = """SELECT 
-{columns}
-FROM gaiadr2.gaia_source
-WHERE 1=CONTAINS(
-  POINT(ra, dec),
-  CIRCLE(88.8, 7.4, 0.08333333))
-"""
-```
-
-As a reminder, here are the columns we want from the Gaia table:
-
-```{code-cell} python
-columns = 'source_id, ra, dec, pmra, pmdec'
-
-cone_query = cone_base_query.format(columns=columns)
-print(cone_query)
-```
-
-```output
-SELECT 
-source_id, ra, dec, pmra, pmdec
-FROM gaiadr2.gaia_source
-WHERE 1=CONTAINS(
-  POINT(ra, dec),
-  CIRCLE(88.8, 7.4, 0.08333333))
-```
-
-We run the query again.
-
-```{code-cell} python
-cone_job = Gaia.launch_job_async(cone_query)
-```
-
-```output
-INFO: Query finished. [astroquery.utils.tap.core]
-```
-
-```{code-cell} python
-cone_results = cone_job.get_results()
-cone_results
-```
-
-```output
-<Table length=594>
-     source_id              ra        ...        pmdec       
-                           deg        ...       mas / yr     
-       int64             float64      ...       float64      
-------------------- ----------------- ... -------------------
-3322773965056065536 88.78178020183375 ... -2.5057036964736907
-3322773758899157120 88.83227057144585 ...                  --
-3322774068134271104  88.8206092188033 ... -1.5260889445858044
-3322773930696320512 88.80843339290348 ... -0.9292104395445717
-3322774377374425728 88.86806108182265 ... -3.8676624830902435
-3322773724537891456 88.81308602813434 ... -33.078133430952086
-[Output truncated]
-```
-
-## Adding the best neighbour table
-
-Now we are ready for the first join. The join operation requires two clauses:
-
-- `JOIN` specifies the name of the table we want to join with, and
-
-- `ON` specifies how we will match up rows between the tables.
-
-In this example, we join with `gaiadr2.panstarrs1_best_neighbour AS best`, which means we can refer to the best neighbor table with the abbreviated name `best`, which will save us a lot of typing. Similarly, we will be referring to the `gaiadr2.gaia_source` table by the abbreviated name `gaia`.
-
-The `ON` clause indicates that we will match up the `source_id` column from the Gaia table with the `source_id` column from the best neighbor table.
-
-```{code-cell} python
-neighbours_base_query = """SELECT 
-{columns}
-FROM gaiadr2.gaia_source AS gaia
-JOIN gaiadr2.panstarrs1_best_neighbour AS best
-  ON gaia.source_id = best.source_id
-WHERE 1=CONTAINS(
-  POINT(gaia.ra, gaia.dec),
-  CIRCLE(88.8, 7.4, 0.08333333))
-"""
-```
-
-````{seealso}
-#### SQL detail
-
-In this example, the `ON` column has the same name in both tables, so we could replace the `ON` clause with a simpler [`USING` clause](https://docs.oracle.com/javadb/10.8.3.0/ref/rrefsqljusing.html):
-
-```USING(source_id)```
-````
-Now that there is more than one table involved, we can't use simple column names any more; we have to use **qualified column names**. In other words, we have to specify which table each column is in. The column names do not have to be the same and, in fact, in the next join they will not be. That is one of the reasons that we explicitly specify them. Here is the complete query, including the columns we want from the Gaia and best neighbor tables. Here you can start to see that using the abbreviated names is making our query easier to read and requires less typing for us. In addition to the spatial coordinates and proper motion, we are going to return the `best_neighbour_multiplicity` and `number_of_mates` columns from the `panstarrs1_best_neighbour` table in order to evaluate the quality of the data that we are using by evaluating the number of one-to-one matches between the catalogs. Recall that `best_neighbour_multiplicity` tells us the number of PanSTARRs objects that match a Gaia object and `number_of_mates` tells us the number of Gaia objects that match a PanSTARRs object.
-
-```{code-cell} python
-column_list_neighbours = ['gaia.source_id',
-               'gaia.ra',
-               'gaia.dec',
-               'gaia.pmra',
-               'gaia.pmdec',
-               'best.best_neighbour_multiplicity',
-               'best.number_of_mates',
-              ]
-columns = ', '.join(column_list_neighbours)
-
-neighbours_query = neighbours_base_query.format(columns=columns)
-print(neighbours_query)
-```
-
-```output
-SELECT 
-gaia.source_id, gaia.ra, gaia.dec, gaia.pmra, gaia.pmdec, best.best_neighbour_multiplicity, best.number_of_mates
-FROM gaiadr2.gaia_source AS gaia
-JOIN gaiadr2.panstarrs1_best_neighbour AS best
-  ON gaia.source_id = best.source_id
-WHERE 1=CONTAINS(
-  POINT(gaia.ra, gaia.dec),
-  CIRCLE(88.8, 7.4, 0.08333333))
-```
-
-```{code-cell} python
-neighbours_job = Gaia.launch_job_async(neighbours_query)
-```
-
-```output
-INFO: Query finished. [astroquery.utils.tap.core]
-```
-
-```{code-cell} python
-neighbours_results = neighbours_job.get_results()
-neighbours_results
-```
-
-```output
-<Table length=490>
-     source_id              ra        ... number_of_mates
-                           deg        ...                
-       int64             float64      ...      int16     
-------------------- ----------------- ... ---------------
-3322773965056065536 88.78178020183375 ...               0
-3322774068134271104  88.8206092188033 ...               0
-3322773930696320512 88.80843339290348 ...               0
-3322774377374425728 88.86806108182265 ...               0
-3322773724537891456 88.81308602813434 ...               0
-3322773724537891328 88.81570329208743 ...               0
-[Output truncated]
-```
-
-This result has fewer rows than the previous result. That is because there are sources in the Gaia table with no corresponding source in the Pan-STARRS table.
-
-By default, the result of the join only includes rows where the same `source_id` appears in both tables. This default is called an "inner" join because the results include only the intersection of the two tables. [You can read about the other kinds of join here](https://www.geeksforgeeks.org/sql-join-set-1-inner-left-right-and-full-joins/).
-
-## Adding the Pan-STARRS table
-
-````{exercise}
-#### Exercise (15 minutes)
-
-Now we are ready to bring in the Pan-STARRS table.  Starting with the previous query, add a second `JOIN` clause that joins with `gaiadr2.panstarrs1_original_valid`, gives it the abbreviated name `ps`, and matches `original_ext_source_id` from the best neighbor table with `obj_id` from the Pan-STARRS table.
-
-Add `g_mean_psf_mag` and `i_mean_psf_mag` to the column list, and run the query. The result should contain 490 rows and 9 columns.
-````
-
-## Selecting by coordinates and proper motion
-
-We are now going to **replace** the cone search with the GD-1 selection that we built in previous episodes. We will start by making sure that our previous query works, then add in the `JOIN`. Now we will bring in the `WHERE` clause from the previous episode, which selects sources based on parallax, BP-RP color, sky coordinates, and proper motion.
+Our starting point will be the query from the [last session](./05-select.md), which selects candidate members of GD-1 from the `gaia_source` table based on their coordinates and proper motion.
 
 Here is `candidate_coord_pm_query_base` from the previous episode.
 
@@ -599,19 +391,184 @@ candidate_coord_pm_results
 [Output truncated]
 ```
 
+Now we will save the results to a table in a format known as [VOTABLE](https://docs.astropy.org/en/latest/io/votable/index.html). Since this file does not need to persist when we reload the notebook, we will just save it to the virtual Colab computer.
+
+```{code-cell} python
+candidate_coord_pm_results.write('pm_candidates.xml', format='votable', overwrite=True)
+```
+
+We can now use the ability of the Gaia Archive to upload a locally stored table and use that in ADQL queries. This is a complex query using software that doesn't provide us with any helpful information for debugging. For this reason we are going to start with a simplified version of what we want to do until we are sure the upload is working. In this simplified query, we just select the top 10 rows from the uploaded table.
+
+```{code-cell} python
+upload_query1 = """
+SELECT
+TOP 10
+source_id, ra, dec, pmra, pmdec
+FROM tap_upload.candidates
+"""
+
+print(upload_query1)
+```
+
+```output
+SELECT
+TOP 10
+source_id, ra, dec, pmra, pmdec
+FROM tap_upload.candidates
+```
+
+The query looks odd, because it uses a table (`tap_upload.candidates`) that doesn't exist on the Gaia Archive. This is a placeholder for the table we will upload. We upload a table by launching a job as usual, but this time we provide the filename of the table to upload (`upload_resource`) and the name we want the table to take on the Gaia Archive (`upload_table_name`).
+
+```{code-cell} python
+upload_resource = "pm_candidates.xml"
+
+upload_job1 = Gaia.launch_job_async(query=upload_query1,
+                                    upload_resource=upload_resource,
+                                    upload_table_name="candidates")
+```
+
+```output
+INFO: Query finished. [astroquery.utils.tap.core]
+```
+
+```{code-cell} python
+upload_test_results = upload_job1.get_results()
+upload_test_results
+```
+
+```output
+<Table length=10>
+    source_id              ra                dec                 pmra               pmdec       
+                          deg                deg               mas / yr            mas / yr     
+      int64             float64            float64             float64             float64      
+------------------ ------------------ ------------------ ------------------- -------------------
+776803968594747136   162.807977546898  40.80285700910209  -3.257059131997733  -12.86054274561872
+780533649472045056 158.26686857438006  41.22707753893632   -4.75839583374629 -14.021405870777913
+646711440715456384 146.05175542652222 26.262980740672766  -3.200253439929835 -11.592708419676654
+647941583773680000 144.70595685628336  28.31528245010732  -5.204082538188394 -12.126004428304531
+648408914870116480 146.16468404343564 29.135031507796842  -5.445518128308852  -12.58776951385475
+785435856431926144 172.01821162737377   46.2110556844209  -4.305247584155119 -12.909299106565935
+[Output truncated]
+```
+
+Since that worked, we can move onto joining our uploaded table of proper motion selected candidates with the Pan-STARRS tables.
+
+## Joining tables
+
+The following figure shows how the Pan-STARRS tables are related to the Gaia table we are uploading.
+
+- The orange circles and arrows represent the first `JOIN` operation, which takes each `source_id` in the Gaia table and finds the same value of `source_id` in the best neighbor table.
+
+- The blue circles and arrows represent the second `JOIN` operation, which takes each `original_ext_source_id` in the Gaia table and finds the same value of `obj_id` in the best neighbor table.
+
+There is no guarantee that the corresponding rows of these tables are in the same order, so the `JOIN` operation involves some searching. However, ADQL/SQL databases are implemented in a way that makes this kind of search efficient. If you are curious, you can [read more about it](https://chartio.com/learn/databases/how-does-indexing-work/).
+
+![Diagram showing relationship between the gaia_source, panstarrs1_best_neighbour, and panstarrs1_original_valid tables and result table.](fig/join.png)
+
+Now we will get to the details of performing a `JOIN` operation. Again, because AQDL does not provide us with any helpful information for debugging, we are going to start with a simplified version of what we want to do until we are sure we are joining the tables correctly.
+
+## Adding the best neighbour table
+
+Now we are ready for the first join. The join operation requires two clauses:
+
+- `JOIN` specifies the name of the table we want to join with, and
+
+- `ON` specifies how we will match up rows between the tables.
+
+In this example, we join with `gaiadr2.panstarrs1_best_neighbour AS best`, which means we can refer to the best neighbor table with the abbreviated name `best`, which will save us a lot of typing. Similarly, we will be referring to the uploaded `tap_uploads.candidates` table by the abbreviated name `gaia`.
+
+The `ON` clause indicates that we will match up the `source_id` column from the Gaia table with the `source_id` column from the best neighbor table.
+
+```{code-cell} python
+neighbours_base_query = """SELECT 
+{columns}
+FROM tap_upload.candidates AS gaia
+JOIN gaiadr2.panstarrs1_best_neighbour AS best
+  ON gaia.source_id = best.source_id
+"""
+```
+
+````{seealso}
+#### SQL detail
+
+In this example, the `ON` column has the same name in both tables, so we could replace the `ON` clause with a simpler [`USING` clause](https://docs.oracle.com/javadb/10.8.3.0/ref/rrefsqljusing.html):
+
+```USING(source_id)```
+````
+Now that there is more than one table involved, we can't use simple column names any more; we have to use **qualified column names**. In other words, we have to specify which table each column is in. The column names do not have to be the same and, in fact, in the next join they will not be. That is one of the reasons that we explicitly specify them. Here is the complete query, including the columns we want from the Gaia and best neighbor tables. Here you can start to see that using the abbreviated names is making our query easier to read and requires less typing for us. In addition to the spatial coordinates and proper motion, we are going to return the `best_neighbour_multiplicity` and `number_of_mates` columns from the `panstarrs1_best_neighbour` table in order to evaluate the quality of the data that we are using by evaluating the number of one-to-one matches between the catalogs. Recall that `best_neighbour_multiplicity` tells us the number of PanSTARRs objects that match a Gaia object and `number_of_mates` tells us the number of Gaia objects that match a PanSTARRs object.
+
+```{code-cell} python
+column_list_neighbours = ['gaia.source_id',
+               'gaia.ra',
+               'gaia.dec',
+               'gaia.pmra',
+               'gaia.pmdec',
+               'best.best_neighbour_multiplicity',
+               'best.number_of_mates',
+              ]
+columns = ', '.join(column_list_neighbours)
+
+neighbours_query = neighbours_base_query.format(columns=columns)
+print(neighbours_query)
+```
+
+```output
+SELECT 
+gaia.source_id, gaia.ra, gaia.dec, gaia.pmra, gaia.pmdec, best.best_neighbour_multiplicity, best.number_of_mates
+FROM tap_upload.candidates AS gaia
+JOIN gaiadr2.panstarrs1_best_neighbour AS best
+  ON gaia.source_id = best.source_id
+```
+
+```{code-cell} python
+neighbours_job = Gaia.launch_job_async(neighbours_query,
+                                       upload_resource=upload_resource,
+                                       upload_table_name="candidates")
+```
+
+```output
+INFO: Query finished. [astroquery.utils.tap.core]
+```
+
+```{code-cell} python
+neighbours_results = neighbours_job.get_results()
+neighbours_results
+```
+
+```output
+<Table length=4300>
+    source_id              ra         ... number_of_mates
+                          deg         ...                
+      int64             float64       ...      int16     
+------------------ ------------------ ... ---------------
+810687480985701120 141.06693861886814 ...               0
+747560017309217792 151.43166838486968 ...               0
+636362356238630272    136.60060290196 ...               0
+636415059782077824 135.72622760078272 ...               0
+803306498086306688 150.68462531561954 ...               0
+[Output truncated]
+```
+
+This result has fewer rows than the previous result. That is because there are sources in the Gaia table with no corresponding source in the Pan-STARRS table.
+
+By default, the result of the join only includes rows where the same `source_id` appears in both tables. This default is called an "inner" join because the results include only the intersection of the two tables. [You can read about the other kinds of join here](https://www.geeksforgeeks.org/sql-join-set-1-inner-left-right-and-full-joins/).
+
+## Adding the Pan-STARRS table
+
 ````{exercise}
 #### Exercise (15 minutes)
 
-Create a new query base called `candidate_join_query_base` that combines the `WHERE` clauses from the previous query with the `JOIN` clauses for the best neighbor and Pan-STARRS tables. Format the query base using the column names in `column_list`, and call the result `candidate_join_query`.
+Now we are ready to bring in the Pan-STARRS table.  Starting with the previous query, add a second `JOIN` clause that joins with `gaiadr2.panstarrs1_original_valid`, gives it the abbreviated name `ps`, and matches `original_ext_source_id` from the best neighbor table with `obj_id` from the Pan-STARRS table.
+
+Add `g_mean_psf_mag` and `i_mean_psf_mag` to the column list, and run the query. The result should contain 4300 rows and 9 columns.
+
+The results table should be called `candidate_table`.
 
 ```{hint}
 Make sure you use qualified column names everywhere!
 ```
+````
 
-Run your query and download the results.  The table you get should have 4300 rows and 9 columns.
-
-The results table should be called `candidate_table`.
-``` `
 
 ## Checking the match
 
